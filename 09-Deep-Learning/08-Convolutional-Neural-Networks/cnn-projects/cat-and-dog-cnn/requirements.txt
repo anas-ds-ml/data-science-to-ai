@@ -2,4 +2,3 @@ streamlit
 tensorflow
 huggingface_hub
 pillow
-numpy

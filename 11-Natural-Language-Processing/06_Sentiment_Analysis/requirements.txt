@@ -4,3 +4,4 @@ scikit-learn
 beautifulsoup4
 better-profanity
 nltk
+huggingface_hub

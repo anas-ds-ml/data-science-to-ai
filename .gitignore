@@ -3,3 +3,11 @@
 
 # Large NLP dataset
 12-Natural-Language-Processing/00_NLP_Basics/combined_data.csv
+
+
+*.keras
+*.h5
+*.pt
+*.pth
+*.pkl
+*.joblib

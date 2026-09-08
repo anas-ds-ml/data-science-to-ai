@@ -11,3 +11,7 @@
 *.pth
 *.pkl
 *.joblib
+
+
+# Class mapping stored on Hugging Face
+class_names.json

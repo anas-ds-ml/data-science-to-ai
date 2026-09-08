@@ -26,6 +26,8 @@ MODEL_REPO = "MuhammadAnasDS/indoor-scene-efficientnet"
 
 MODEL_FILE = "indoor_scene_efficientnet_final.keras"
 
+CLASS_NAMES_FILE = "class_names.json"
+
 IMAGE_SIZE = (224, 224)
 
 
@@ -54,22 +56,52 @@ def load_model():
         repo_type="model"
     )
 
-    model = keras.models.load_model(model_path)
+    model = keras.models.load_model(
+        model_path
+    )
 
     return model
 
 
 # =========================================================
-# LOAD MODEL
+# LOAD CLASS NAMES FROM HUGGING FACE
+# =========================================================
+
+@st.cache_data
+def load_class_names():
+
+    class_names_path = hf_hub_download(
+        repo_id=MODEL_REPO,
+        filename=CLASS_NAMES_FILE,
+        repo_type="model"
+    )
+
+    with open(
+        class_names_path,
+        "r"
+    ) as f:
+
+        class_names = json.load(f)
+
+    return class_names
+
+
+# =========================================================
+# LOAD MODEL + CLASS NAMES
 # =========================================================
 
 try:
 
     model = load_model()
 
+    class_names = load_class_names()
+
 except Exception as e:
 
-    st.error("❌ Could not load the model from Hugging Face.")
+    st.error(
+        "❌ Could not load the model or class names "
+        "from Hugging Face."
+    )
 
     st.exception(e)
 
@@ -77,81 +109,18 @@ except Exception as e:
 
 
 # =========================================================
-# CLASS NAMES
+# VERIFY CLASS COUNT
 # =========================================================
 
-class_names = [
-    "airport_inside",
-    "artstudio",
-    "auditorium",
-    "bakery",
-    "bar",
-    "bathroom",
-    "bedroom",
-    "bookstore",
-    "bowling",
-    "buffet",
-    "casino",
-    "children_room",
-    "church_inside",
-    "classroom",
-    "cloister",
-    "closet",
-    "clothingstore",
-    "computerroom",
-    "concert_hall",
-    "conference_center",
-    "conference_room",
-    "corridor",
-    "deli",
-    "dentaloffice",
-    "dining_room",
-    "door",
-    "elevator",
-    "fastfood_restaurant",
-    "florist",
-    "gameroom",
-    "garage",
-    "greenhouse",
-    "grocerystore",
-    "gym",
-    "hairsalon",
-    "hospitalroom",
-    "inside_bus",
-    "inside_subway",
-    "jewelleryshop",
-    "kindergarden",
-    "kitchen",
-    "laboratorywet",
-    "laundromat",
-    "library",
-    "livingroom",
-    "lobby",
-    "locker_room",
-    "mall",
-    "meeting_room",
-    "movietheater",
-    "museum",
-    "nursery",
-    "office",
-    "operating_room",
-    "pantry",
-    "poolinside",
-    "prisoncell",
-    "restaurant",
-    "restaurant_kitchen",
-    "shoeshop",
-    "staircase",
-    "studiomusic",
-    "subway",
-    "toilet",
-    "trainstation",
-    "tv_studio",
-    "videostore",
-    "waitingroom",
-    "warehouse",
-    "winecellar"
-]
+if len(class_names) != 67:
+
+    st.error(
+        f"❌ Expected 67 classes, "
+        f"but found {len(class_names)} classes "
+        "in class_names.json."
+    )
+
+    st.stop()
 
 
 # =========================================================
@@ -160,7 +129,11 @@ class_names = [
 
 uploaded_file = st.file_uploader(
     "Upload an indoor scene image",
-    type=["jpg", "jpeg", "png"]
+    type=[
+        "jpg",
+        "jpeg",
+        "png"
+    ]
 )
 
 
@@ -172,28 +145,44 @@ if uploaded_file is not None:
 
     try:
 
-        # Open image
-        image = Image.open(uploaded_file).convert("RGB")
+        # -------------------------------------------------
+        # OPEN IMAGE
+        # -------------------------------------------------
 
-        # Display image
+        image = Image.open(
+            uploaded_file
+        ).convert("RGB")
+
+
+        # -------------------------------------------------
+        # DISPLAY IMAGE
+        # -------------------------------------------------
+
         st.image(
             image,
             caption="Uploaded Image",
             use_container_width=True
         )
 
+
         # -------------------------------------------------
         # PREPROCESS IMAGE
         # -------------------------------------------------
 
-        resized_image = image.resize(IMAGE_SIZE)
+        resized_image = image.resize(
+            IMAGE_SIZE
+        )
 
-        image_array = np.array(resized_image)
+        image_array = np.array(
+            resized_image,
+            dtype=np.float32
+        )
 
         image_array = np.expand_dims(
             image_array,
             axis=0
         )
+
 
         # -------------------------------------------------
         # MODEL PREDICTION
@@ -204,21 +193,39 @@ if uploaded_file is not None:
             verbose=0
         )
 
-        # Get probabilities
+
+        # -------------------------------------------------
+        # GET PROBABILITIES
+        # -------------------------------------------------
+
         probabilities = predictions[0]
 
-        # Find highest probability
-        predicted_index = np.argmax(probabilities)
 
-        predicted_class = class_names[predicted_index]
+        # -------------------------------------------------
+        # GET PREDICTED CLASS
+        # -------------------------------------------------
+
+        predicted_index = int(
+            np.argmax(probabilities)
+        )
+
+        predicted_class = class_names[
+            predicted_index
+        ]
+
+
+        # -------------------------------------------------
+        # GET CONFIDENCE
+        # -------------------------------------------------
 
         confidence = float(
             probabilities[predicted_index]
         )
 
-        # -------------------------------------------------
-        # DISPLAY RESULT
-        # -------------------------------------------------
+
+        # =================================================
+        # DISPLAY PREDICTION
+        # =================================================
 
         st.subheader("Prediction")
 
@@ -227,24 +234,35 @@ if uploaded_file is not None:
         )
 
         st.write(
-            f"Confidence: **{confidence * 100:.2f}%**"
+            f"Confidence: "
+            f"**{confidence * 100:.2f}%**"
         )
 
-        st.progress(confidence)
+        st.progress(
+            confidence
+        )
 
-        # -------------------------------------------------
+
+        # =================================================
         # TOP 5 PREDICTIONS
-        # -------------------------------------------------
+        # =================================================
 
-        st.subheader("Top 5 Predictions")
+        st.subheader(
+            "Top 5 Predictions"
+        )
 
         top_5_indices = np.argsort(
             probabilities
         )[-5:][::-1]
 
+
         for index in top_5_indices:
 
-            class_name = class_names[index]
+            index = int(index)
+
+            class_name = class_names[
+                index
+            ]
 
             probability = float(
                 probabilities[index]
@@ -254,6 +272,11 @@ if uploaded_file is not None:
                 f"**{class_name}** — "
                 f"{probability * 100:.2f}%"
             )
+
+
+    # =====================================================
+    # IMAGE PROCESSING ERROR
+    # =====================================================
 
     except Exception as e:
 
